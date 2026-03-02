@@ -1,0 +1,19 @@
+language = "C"
+include_guard = "SPATIAL_CODEC_DRACO_H"
+pragma_once = true
+
+# Only export the C ABI surface.
+# We keep Rust-only helpers/types private to avoid ABI drift.
+[export]
+include = ["PointCloudEncodingMethod", "SpatialDracoStatus", "SpatialDracoBytes", "SpatialDracoPointCloudF32Rgb8", "SpatialDracoEncodeConfig",
+           "spatial_draco_encode_f32_rgb8", "spatial_draco_decode_f32_rgb8",
+           "spatial_draco_bytes_free", "spatial_draco_point_cloud_free"]
+
+[parse]
+parse_deps = false
+
+[defines]
+"target_os = windows" = "SPATIAL_DRACO_WINDOWS"
+
+[enum]
+prefix_with_name = false
