@@ -9,6 +9,32 @@ repository = "https://github.com/idlab-discover/spatial-codec-draco/"
 readme = "README.md"
 # Prevent multiple crates in the same dependency graph from trying to build/link Draco independently.
 links = "spatial_codec_draco"
+# Only include relevant files in the published crate
+include = [
+  "Cargo.toml",
+  "README.md",
+  "LICENSE",
+  "NOTICE",
+  "build.rs",
+  "cbindgen.toml",
+  "bindings/**",
+  "docs/**",
+  "src/**",
+  "tests/**",
+  "examples/**",
+  "draco_wrapper_cpp/**",
+
+  # Minimal Draco subset needed to build from source
+  "draco/CMakeLists.txt",
+  "draco/LICENSE",
+  "draco/AUTHORS",
+  "draco/README.md",
+  "draco/cmake/**",
+  "draco/src/**",
+
+  # In case upstream adds deps here (harmless if absent)
+  "draco/third_party/**",
+]
 
 [lib]
 # "staticlib" and "cdylib" are useful when linking from C/C++ or other languages.
