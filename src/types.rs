@@ -1,10 +1,11 @@
+use serde::{Deserialize, Serialize};
 use crate::error::DracoError;
 
 /// Draco point cloud encoding method.
 ///
 /// The numeric values are part of the C ABI surface (see `docs/ffi.md`).
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone, Eq, PartialEq)]
 pub enum PointCloudEncodingMethod {
     /// Sequential encoding.
     Sequential = 0,
@@ -16,7 +17,7 @@ pub enum PointCloudEncodingMethod {
 ///
 /// These parameters map to Draco's encoder settings.
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone, Eq, PartialEq)]
 pub struct EncodeConfig {
     /// Quantization bits for positions (XYZ).
     ///

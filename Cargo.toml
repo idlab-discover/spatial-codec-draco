@@ -52,6 +52,7 @@ default = []
 [dependencies]
 # Only needed for the C ABI surface (ffi feature).
 libc = { version = "0.2", optional = true }
+serde = { version = "1", features = ["derive"] }
 
 [build-dependencies]
 cmake = "0.1"
@@ -62,6 +63,5 @@ cbindgen = "0.29"
 clap = { version = "4.5", features = ["derive"] }
 tracing = { version = "0.1", features = ["attributes"] }
 tracing-subscriber = "0.3"
-serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 nalgebra = "0.34"
