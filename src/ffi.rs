@@ -168,8 +168,24 @@ pub extern "C" fn spatial_draco_encode_f32_rgb8(
             }
         };
 
-        let coords_s = unsafe { core::slice::from_raw_parts(coords, coords_len) };
-        let colors_s = unsafe { core::slice::from_raw_parts(colors, colors_len) };
+        let coords_s = unsafe {
+            let temp = core::slice::from_raw_parts(coords, coords_len);
+            // Compact Vec<f32> to Vec<[f32; 3]> to match the expected input of encode_draco_with_config.
+            let mut compact = Vec::with_capacity(num_points);
+            for chunk in temp.chunks_exact(3) {
+                compact.push([chunk[0], chunk[1], chunk[2]]);
+            }
+            compact
+        };
+        let colors_s = unsafe { 
+            let temp = core::slice::from_raw_parts(colors, colors_len);
+            // Compact Vec<u8> to Vec<[u8; 3]> to match the expected input of encode_draco_with_config.
+            let mut compact = Vec::with_capacity(num_points);
+            for chunk in temp.chunks_exact(3) {
+                compact.push([chunk[0], chunk[1], chunk[2]]);
+            }
+            compact
+        };
 
         let encoded = encode_draco_with_config(coords_s, colors_s, encoding_method, &cfg)
             .map_err(map_err)?;

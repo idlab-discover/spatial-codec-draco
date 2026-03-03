@@ -155,20 +155,12 @@ DracoWrapperEncodeResult *draco_wrapper_encode_points_to_draco(
             true,
             point_cloud.num_points());
 
-        float pos[3];
-        uint8_t col[3];
         for (uint32_t i = 0; i < point_cloud.num_points(); i++) {
             const size_t base = static_cast<size_t>(i) * 3u;
-            pos[0] = coords[base + 0];
-            pos[1] = coords[base + 1];
-            pos[2] = coords[base + 2];
-
-            col[0] = colors[base + 0];
-            col[1] = colors[base + 1];
-            col[2] = colors[base + 2];
-
-            position_attribute->SetAttributeValue(draco::AttributeValueIndex(i), pos);
-            color_attribute->SetAttributeValue(draco::AttributeValueIndex(i), col);
+            position_attribute->SetAttributeValue(
+                draco::AttributeValueIndex(i), coords + base);
+            color_attribute->SetAttributeValue(
+                draco::AttributeValueIndex(i), colors + base);
         }
 
         (void)point_cloud.AddAttribute(std::move(position_attribute));
@@ -242,22 +234,13 @@ DracoWrapperDecodeResult *draco_wrapper_decode_draco_data(const uint8_t *encoded
         }
         const draco::PointAttribute *col_att = point_cloud.GetAttributeByUniqueId(col_att_id);
 
-        std::vector<float> coords;
-        std::vector<uint8_t> colors;
-        coords.resize(num_points * 3);
-        colors.resize(num_points * 3);
-
-        for (draco::PointIndex i(0); i < point_cloud.num_points(); ++i) {
-            pos_att->GetValue(draco::AttributeValueIndex(i.value()), &coords[i.value() * 3]);
-            col_att->GetValue(draco::AttributeValueIndex(i.value()), &colors[i.value() * 3]);
-        }
-
-        // Copy to heap buffers owned by the result.
         result->coords = new float[num_points * 3];
         result->colors = new uint8_t[num_points * 3];
-        for (size_t i = 0; i < num_points * 3; i++) {
-            result->coords[i] = coords[i];
-            result->colors[i] = colors[i];
+
+        for (draco::PointIndex i(0); i < point_cloud.num_points(); ++i) {
+            const size_t base = static_cast<size_t>(i.value()) * 3u;
+            pos_att->GetValue(draco::AttributeValueIndex(i.value()), result->coords + base);
+            col_att->GetValue(draco::AttributeValueIndex(i.value()), result->colors + base);
         }
 
         result->success = true;

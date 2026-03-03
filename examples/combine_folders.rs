@@ -22,7 +22,7 @@ use serde::Deserialize;
 use tracing::{error, info};
 use tracing_subscriber::FmtSubscriber;
 
-use spatial_codec_draco::{decode_draco, encode_draco, PointCloudEncodingMethod};
+use spatial_codec_draco::{decode_draco_compact, encode_draco, PointCloudEncodingMethod};
 
 /// CLI arguments.
 #[derive(Parser, Debug)]
@@ -104,7 +104,7 @@ fn load_transforms(file: &Path) -> io::Result<HashMap<PathBuf, Transform>> {
 }
 
 /// Apply T * R * S in place (scale → rotate → translate).
-fn transform_vertices(v: &mut [f32], t: &Transform) {
+fn transform_vertices(v: &mut [[f32; 3]], t: &Transform) {
     if t == &Transform::default() {
         return;
     }
@@ -113,12 +113,12 @@ fn transform_vertices(v: &mut [f32], t: &Transform) {
     let trn = Vector3::from(t.position);
     let scl = Vector3::from(t.scale);
 
-    for chunk in v.chunks_exact_mut(3) {
-        let p = Vector3::new(chunk[0], chunk[1], chunk[2]).component_mul(&scl);
+    for pos in v.iter_mut() {
+        let p = Vector3::new(pos[0], pos[1], pos[2]).component_mul(&scl);
         let p = rot * p + trn;
-        chunk[0] = p.x;
-        chunk[1] = p.y;
-        chunk[2] = p.z;
+        pos[0] = p.x;
+        pos[1] = p.y;
+        pos[2] = p.z;
     }
 }
 
@@ -205,13 +205,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (zero_idx, id) in (1..=max_frames).enumerate() {
         let frame_start = Instant::now();
 
-        let mut combined_vertices = Vec::<f32>::new();
-        let mut combined_colors = Vec::<u8>::new();
+        let mut combined_vertices = Vec::<[f32; 3]>::new();
+        let mut combined_colors = Vec::<[u8; 3]>::new();
 
         for (dir_idx, dir) in input_dirs.iter().enumerate() {
             if let Some(path) = dir_frames[dir_idx].get(zero_idx) {
                 let data = fs::read(path)?;
-                match decode_draco(&data) {
+                match decode_draco_compact(&data) {
                     Ok((mut verts, cols)) => {
                         let default_tf = Transform::default();
                         let tf = transforms.get(dir).unwrap_or(&default_tf);

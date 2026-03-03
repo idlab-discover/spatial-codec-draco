@@ -41,8 +41,8 @@ cargo build
 ```rust
 use spatial_codec_draco::{decode_draco, encode_draco, EncodeConfig, PointCloudEncodingMethod};
 
-let coords: Vec<f32> = vec![0.0, 0.0, 0.0,  1.0, 0.0, 0.0];
-let colors: Vec<u8>  = vec![255, 0, 0,      0, 255, 0];
+let coords: Vec<[f32; 3]> = vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]];
+let colors: Vec<[u8; 3]> = vec![[255, 0, 0], [0, 255, 0]];
 
 // Convenience: uses `EncodeConfig::default()`.
 let encoded = encode_draco(&coords, &colors, PointCloudEncodingMethod::KdTree)?;
