@@ -17,13 +17,13 @@ option(SPATIAL_DRACO_MSVC_STATIC_RUNTIME "For MSVC: prefer /MT over /MD (must ma
 option(SPATIAL_DRACO_WERROR "Treat warnings as errors for the wrapper (not Draco)" OFF)
 
 # Select MSVC runtime early so it affects all downstream targets (including Draco).
-if (MSVC)
-  if (SPATIAL_DRACO_MSVC_STATIC_RUNTIME)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-  else()
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL$<$<CONFIG:Debug>:Debug>")
-  endif()
-endif()
+#if (MSVC)
+#  if (SPATIAL_DRACO_MSVC_STATIC_RUNTIME)
+#    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+#  else()
+#    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL$<$<CONFIG:Debug>:Debug>")
+#  endif()
+#endif()
 
 # Standards / PIC
 set(CMAKE_C_STANDARD 17)
@@ -59,6 +59,19 @@ endif()
 # Draco generates draco/draco_features.h under ${CMAKE_BINARY_DIR}/draco/...
 add_subdirectory(../draco ${CMAKE_BINARY_DIR}/draco)
 
+# Draco target naming differs across versions/build options.
+# Prefer static if available, otherwise fall back to whatever Draco exports.
+set(SPATIAL_DRACO_TARGET "")
+if(TARGET draco_static)
+  set(SPATIAL_DRACO_TARGET draco_static)
+elseif(TARGET draco)
+  set(SPATIAL_DRACO_TARGET draco)
+elseif(TARGET draco_shared)
+  set(SPATIAL_DRACO_TARGET draco_shared)
+else()
+  message(FATAL_ERROR "Could not find a Draco CMake target (expected draco_static, draco, or draco_shared).")
+endif()
+
 # -------------------------
 # Wrapper library
 # -------------------------
@@ -85,12 +98,8 @@ target_include_directories(draco_wrapper_cpp_static
     ${CMAKE_BINARY_DIR}/draco    # harmless; keeps other generated includes working
 )
 
-target_link_libraries(draco_wrapper_cpp_static
-  PUBLIC
-    draco_static
-)
-
-add_dependencies(draco_wrapper_cpp_static draco_static)
+add_dependencies(draco_wrapper_cpp_static ${SPATIAL_DRACO_TARGET})
+target_link_libraries(draco_wrapper_cpp_static PUBLIC ${SPATIAL_DRACO_TARGET})
 
 # -------------------------
 # Toolchain-conditional flags

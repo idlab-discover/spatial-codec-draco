@@ -32,6 +32,54 @@ fn env_target_opt(prefix: &str, target: &str) -> Option<String> {
     env_opt(&key).or_else(|| env_opt(prefix))
 }
 
+#[cfg(windows)]
+fn strip_windows_verbatim_prefix(p: &Path) -> PathBuf {
+    use std::path::{Component, Prefix};
+
+    let mut comps = p.components();
+    match comps.next() {
+        Some(Component::Prefix(prefix)) => match prefix.kind() {
+            // \\?\C:\...
+            Prefix::VerbatimDisk(drive) => {
+                let mut out = PathBuf::from(format!("{}:\\", drive as char));
+                for c in comps {
+                    out.push(c.as_os_str());
+                }
+                out
+            }
+            // \\?\UNC\server\share\...
+            Prefix::VerbatimUNC(server, share) => {
+                let mut out = PathBuf::from(r"\\");
+                out.push(server);
+                out.push(share);
+                for c in comps {
+                    out.push(c.as_os_str());
+                }
+                out
+            }
+            _ => p.to_path_buf(),
+        },
+        _ => p.to_path_buf(),
+    }
+}
+
+#[cfg(not(windows))]
+fn strip_windows_verbatim_prefix(p: &Path) -> PathBuf {
+    p.to_path_buf()
+}
+
+fn fnv1a64(s: &str) -> u64 {
+    const FNV_OFFSET: u64 = 0xcbf29ce484222325;
+    const FNV_PRIME: u64 = 0x100000001b3;
+
+    let mut h = FNV_OFFSET;
+    for &b in s.as_bytes() {
+        h ^= b as u64;
+        h = h.wrapping_mul(FNV_PRIME);
+    }
+    h
+}
+
 fn ensure_file(path: &Path, hint: &str) -> Result<(), String> {
     if path.is_file() {
         Ok(())
@@ -56,6 +104,9 @@ fn resolve_out_dir(manifest_dir: &Path, target: &str, profile: &str) -> Result<P
 
     let base = if let Some(p) = env::var_os("SPATIAL_DRACO_OUT_DIR") {
         PathBuf::from(p)
+    } else if cfg!(windows) {
+        // Keep build paths short on Windows to avoid MAX_PATH/MSBuild issues.
+        manifest_dir.join(".cmake-out")
     } else if let Some(p) = env::var_os("CARGO_TARGET_DIR") {
         PathBuf::from(p).join("cmake-out")
     } else {
@@ -63,9 +114,23 @@ fn resolve_out_dir(manifest_dir: &Path, target: &str, profile: &str) -> Result<P
     };
 
     let base = if base.is_absolute() { base } else { manifest_dir.join(base) };
+
+    // IMPORTANT: do NOT canonicalize on Windows (it introduces \\?\ paths).
+    #[cfg(windows)]
+    let base = strip_windows_verbatim_prefix(&base);
+    #[cfg(not(windows))]
     let base = fs::canonicalize(&base).unwrap_or(base);
 
-    let out_dir = base.join("spatial_codec_draco").join(target).join(profile);
+    // Shorten deep paths on Windows aggressively.
+    let prof = if profile.eq_ignore_ascii_case("release") { "rel" } else { "dbg" };
+    let tgt_hash = format!("{:016x}", fnv1a64(target));
+
+    let out_dir = if cfg!(windows) {
+        base.join("scd").join(tgt_hash).join(prof)
+    } else {
+        base.join("spatial_codec_draco").join(target).join(profile)
+    };
+
     fs::create_dir_all(&out_dir)
         .map_err(|e| format!("Failed to create build output directory {}: {e}", out_dir.display()))?;
 
@@ -187,7 +252,7 @@ fn build_cpp(manifest_dir: &Path, out_dir: &Path, target: &str) -> Result<PathBu
     cfg.profile(if profile.eq_ignore_ascii_case("release") { "Release" } else { "Debug" });
 
     let dst = cfg.build_target("draco_wrapper_cpp_static").build();
-    Ok(fs::canonicalize(&dst).unwrap_or(dst))
+    Ok(strip_windows_verbatim_prefix(&dst))
 }
 
 fn emit_link(dst: &Path, target: &str) -> Result<(), String> {
@@ -199,25 +264,42 @@ fn emit_link(dst: &Path, target: &str) -> Result<(), String> {
         ));
     }
 
-    println!("cargo:rustc-link-search=native={}", build_dir.display());
-    println!("cargo:rustc-link-lib=static=draco_wrapper_cpp_static");
+    // On MSVC generators, libs can land in config subdirs (Release/Debug).
+    // Emit a few safe candidates; rustc ignores non-existing ones.
+    let mut search_dirs: Vec<PathBuf> = Vec::with_capacity(16);
+    search_dirs.push(build_dir.clone());
+    search_dirs.push(build_dir.join("Release"));
+    search_dirs.push(build_dir.join("Debug"));
+    search_dirs.push(build_dir.join("RelWithDebInfo"));
+    search_dirs.push(build_dir.join("MinSizeRel"));
 
     let draco_dir = build_dir.join("draco");
-    println!("cargo:rustc-link-search=native={}", draco_dir.display());
+    search_dirs.push(draco_dir.clone());
+    search_dirs.push(draco_dir.join("Release"));
+    search_dirs.push(draco_dir.join("Debug"));
+    search_dirs.push(draco_dir.join("RelWithDebInfo"));
+    search_dirs.push(draco_dir.join("MinSizeRel"));
+
+    // De-dup while preserving order.
+    search_dirs.dedup();
+
+    for dir in search_dirs {
+        if dir.is_dir() {
+            println!("cargo:rustc-link-search=native={}", dir.display());
+        }
+    }
+
+    println!("cargo:rustc-link-lib=static=draco_wrapper_cpp_static");
     println!("cargo:rustc-link-lib=static=draco");
 
     if target.contains("apple-darwin") {
         println!("cargo:rustc-link-lib=dylib=c++");
     } else if target.contains("linux") {
         println!("cargo:rustc-link-lib=dylib=stdc++");
-    } else if target.contains("windows")
-        && target.contains("gnu") {
-            // MinGW-w64 toolchains.
-            println!("cargo:rustc-link-lib=stdc++");
-        }
+    } else if target.contains("windows") && target.contains("gnu") {
+        println!("cargo:rustc-link-lib=stdc++");
+    }
 
-    // Optional: statically link libstdc++/libgcc when producing Windows GNU binaries.
-    // NOTE: These are *linker* flags; emitting them via CMake compile flags is ineffective.
     if target.contains("windows") && target.contains("gnu") && env_bool("DRACO_STATIC_STDLIB") {
         println!("cargo:rustc-link-arg=-static");
         println!("cargo:rustc-link-arg=-static-libgcc");

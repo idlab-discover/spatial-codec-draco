@@ -1,3 +1,4 @@
 output/**/*
 target/**/*
 Cargo.lock
+.cmake-out/
