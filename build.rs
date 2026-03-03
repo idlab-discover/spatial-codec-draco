@@ -210,12 +210,11 @@ fn emit_link(dst: &Path, target: &str) -> Result<(), String> {
         println!("cargo:rustc-link-lib=dylib=c++");
     } else if target.contains("linux") {
         println!("cargo:rustc-link-lib=dylib=stdc++");
-    } else if target.contains("windows") {
-        if target.contains("gnu") {
+    } else if target.contains("windows")
+        && target.contains("gnu") {
             // MinGW-w64 toolchains.
             println!("cargo:rustc-link-lib=stdc++");
         }
-    }
 
     // Optional: statically link libstdc++/libgcc when producing Windows GNU binaries.
     // NOTE: These are *linker* flags; emitting them via CMake compile flags is ineffective.
