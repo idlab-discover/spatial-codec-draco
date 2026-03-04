@@ -295,8 +295,10 @@ fn emit_link(dst: &Path, target: &str) -> Result<(), String> {
     if target.contains("apple-darwin") {
         println!("cargo:rustc-link-lib=dylib=c++");
     } else if target.contains("linux") {
-        //println!("cargo:rustc-link-lib=dylib=stdc++");
-        println!("cargo:rustc-link-lib=dylib=:libstdc++.so.6");
+        println!("cargo:rustc-link-arg=-Wl,-l:libstdc++.so.6");
+
+        println!("cargo:rustc-link-lib=dylib=stdc++");
+        //println!("cargo:rustc-link-lib=dylib=:libstdc++.so.6");
     } else if target.contains("windows") && target.contains("gnu") {
         println!("cargo:rustc-link-lib=stdc++");
     }
