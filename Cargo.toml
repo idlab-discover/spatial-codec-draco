@@ -1,6 +1,6 @@
 [package]
 name = "spatial_codec_draco"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2021"
 build = "build.rs"
 license = "MIT OR Apache-2.0"

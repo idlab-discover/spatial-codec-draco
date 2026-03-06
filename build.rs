@@ -295,6 +295,8 @@ fn emit_link(dst: &Path, target: &str) -> Result<(), String> {
     if target.contains("apple-darwin") {
         println!("cargo:rustc-link-lib=dylib=c++");
     } else if target.contains("linux") {
+        // Detect which linux gnu version is installed 
+        println!("cargo:rustc-link-search=native=/usr/lib/gcc/x86_64-linux-gnu/11");
         println!("cargo:rustc-link-arg=-Wl,-l:libstdc++.so.6");
 
         println!("cargo:rustc-link-lib=dylib=stdc++");
